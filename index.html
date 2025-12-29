@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Доступ к контенту</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 25px;
+        }
+        input {
+            width: 100%;
+            padding: 12px 15px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #4a90e2;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            background: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #3a7bc8;
+        }
+        .error {
+            color: #e74c3c;
+            margin-top: 10px;
+            text-align: center;
+            min-height: 20px;
+            font-size: 14px;
+        }
+        .success {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8f5e9;
+            border-radius: 6px;
+            border-left: 4px solid #2ecc71;
+            text-align: center;
+            display: none;
+        }
+        .success a {
+            color: #27ae60;
+            font-weight: bold;
+            text-decoration: none;
+            word-break: break-all;
+            display: block;
+            margin-top: 5px;
+        }
+        .success a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Введите кодовое слово</h2>
+        <input type="text" id="password" placeholder="Введите слово..." autocomplete="off" autofocus>
+        <button onclick="validateAccess()">Получить доступ</button>
+        <div id="error" class="error"></div>
+        <div id="success" class="success">
+            Доступ разрешен!<br>
+            <a id="secretLink" target="_blank">Перейти по ссылке</a>
+        </div>
+    </div>
+
+<script>
+
+const fragments = [
+    "aHR0cHM6Ly",                     
+    "90ZWxlZ3JhL",                     
+    "nBoL0NoYXAt",                    
+    "My0xMi0yOQ==",                   
+    "0YHRgtCw0L",                     
+    "I="                               
+];
+
+
+const HASH_CONST = 391;
+
+
+function restoreData(type) {
+    if (type === 'link') {
+        
+        return fragments[0].slice(0, -1) + 
+               fragments[1].slice(1) + 
+               fragments[2].slice(1) + 
+               fragments[3];
+    } else {
+        
+        return fragments[5] + fragments[4].slice(2);
+    }
+}
+
+
+function decodeWithKey(encodedData, cipherKey) {
+    const binaryData = atob(encodedData);
+    let result = "";
+    for (let i = 0; i < binaryData.length; i++) {
+        const keyChar = cipherKey.charCodeAt(i % cipherKey.length);
+        const dataChar = binaryData.charCodeAt(i);
+        result += String.fromCharCode(dataChar ^ keyChar);
+    }
+    return result;
+}
+
+
+function verifyPassword(input) {
+    
+    if (input.length !== 4) return false;
+    
+    
+    const computedHash = input.split('')
+        .reduce((acc, char, idx) => acc + (char.charCodeAt(0) * (idx + 1)), 0);
+    if (computedHash !== HASH_CONST) return false;
+    
+    
+    try {
+        const encryptedPass = restoreData('password');
+        const key = String.fromCharCode(115, 116, 97, 118, 95, 107); // "stav_k"
+        const realPassword = decodeWithKey(encryptedPass, key);
+        return input === realPassword;
+    } catch {
+        return false;
+    }
+}
+
+// 
+function getSecretLink() {
+    try {
+        const encryptedLink = restoreData('link');
+        const key = String.fromCharCode(116, 101, 108, 101, 103, 114); // "telegr"
+        return decodeWithKey(encryptedLink, key);
+    } catch {
+        return null;
+    }
+}
+
+
+
+function validateAccess() {
+    const input = document.getElementById('password').value.trim();
+    const errorDiv = document.getElementById('error');
+    const successDiv = document.getElementById('success');
+    const linkElement = document.getElementById('secretLink');
+    
+    
+    errorDiv.textContent = '';
+    successDiv.style.display = 'none';
+    
+    
+    if (!input) {
+        errorDiv.textContent = 'Введите кодовое слово';
+        return;
+    }
+    
+    
+    if (verifyPassword(input)) {
+        const secretLink = getSecretLink();
+        if (secretLink) {
+            linkElement.href = secretLink;
+            linkElement.textContent = secretLink;
+            successDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                window.open(secretLink, '_blank');
+            }, 2000);
+        } else {
+            errorDiv.textContent = 'Ошибка системы';
+        }
+    } else {
+        errorDiv.textContent = '
+          Неверное кодовое слово';
+        
+        const inputField = document.getElementById('password');
+        inputField.style.borderColor = '#e74c3c';
+        setTimeout(() => {
+            inputField.style.borderColor = '#ddd';
+        }, 1000);
+    }
+}
+
+
+document.getElementById('password').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        validateAccess();
+    }
+});
+
+
+window.addEventListener('load', function() {
+    document.getElementById('password').focus();
+});
+
+
+window.addEventListener('contextmenu', function(e) {
+    if (e.target.nodeName === 'INPUT') return;
+    
+});
+
+console.log('Система доступа инициализирована');
+</script>
+</body>
+</html>
